@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+.streamlit/secrets.toml
+.venv-1/
+.DS_Store
+simulation_tracker.json
+DISCLOSURE_LOG.md
+EVIDENCE_SNAPSHOT_*.md
+FINAL_OWNERSHIP_AND_COMPLIANCE_NOTE.md
+LEGAL_PROTECTION_PACKET.md
+US_LAUNCH_LEGAL_CHECKLIST.md
+legal/
