@@ -128,7 +128,7 @@ def simulate_day(
     if edges.empty:
         return {"date": target_date.isoformat(), "skipped": True, "reason": "No edges generated"}
 
-    picks = edges[edges["edge"] >= (min_edge_pct / 100)].copy()
+    picks = BettingEngine.filter_realistic(edges, min_edge_pct, 50.0)
     if picks.empty:
         return {
             "date": target_date.isoformat(),

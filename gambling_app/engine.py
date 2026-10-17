@@ -10,6 +10,11 @@ import pandas as pd
 from .constants import MLB_TEAM_NAME_MAP, NBA_TEAM_NAMES
 
 
+# How much value (edge) counts relative to raw win probability when ranking picks.
+# score = model_prob + WIN_PROB_EDGE_WEIGHT * edge  (higher weight = more value-driven)
+WIN_PROB_EDGE_WEIGHT = 2.0
+
+
 class BettingEngine:
     @staticmethod
     def american_to_decimal(american_odds: float) -> float:
@@ -315,12 +320,23 @@ class BettingEngine:
 
         df = pd.DataFrame(rows)
         if not df.empty:
-            df = df.sort_values(by="edge", ascending=False)
+            # Rank by likelihood to win AND value, not value alone. Pure edge ranking
+            # surfaces longshots the market underprices; this keeps real favorites on top.
+            df["pick_score"] = df["model_prob"] + (WIN_PROB_EDGE_WEIGHT * df["edge"])
+            df = df.sort_values(by="pick_score", ascending=False)
         return df
 
     @staticmethod
+    def filter_realistic(edges_df: pd.DataFrame, min_edge_pct: float, min_win_prob_pct: float) -> pd.DataFrame:
+        """Keep picks with positive value that the model also expects to win."""
+        if edges_df.empty:
+            return edges_df
+        mask = (edges_df["edge"] >= min_edge_pct / 100) & (edges_df["model_prob"] >= min_win_prob_pct / 100)
+        return edges_df[mask].copy()
+
+    @staticmethod
     def build_parlays(plays_df: pd.DataFrame, max_legs: int, top_n: int) -> pd.DataFrame:
-        sort_cols = [col for col in ["edge", "ev_per_1u"] if col in plays_df.columns]
+        sort_cols = [col for col in ["pick_score", "edge", "ev_per_1u"] if col in plays_df.columns][:1]
         if not sort_cols:
             return pd.DataFrame()
 

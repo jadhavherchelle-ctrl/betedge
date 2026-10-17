@@ -203,12 +203,14 @@ class BettingApp:
         if working.empty:
             return empty
 
-        filtered = working[working["edge"] >= (float(settings["min_edge"]) / 100)].copy()
+        filtered = BettingEngine.filter_realistic(
+            working, float(settings["min_edge"]), float(st.session_state.get("min_win_prob", 50.0))
+        )
         if filtered.empty:
             return empty
 
         seed_games = (
-            filtered.sort_values(by="edge", ascending=False)
+            filtered.sort_values(by="pick_score", ascending=False)
             .head(int(settings["parlay_top_n"]))["game"]
             .drop_duplicates().tolist()
         )
@@ -524,12 +526,13 @@ h2, h3 { color: #c9d1d9 !important; font-weight: 700 !important; }
         with st.expander(f"Schedule — {len(schedule)} games", expanded=False):
             st.dataframe(schedule[["game", "Start"]].rename(columns={"game": "Game"}), use_container_width=True, hide_index=True)
 
-        filtered = edges_df[edges_df["edge"] >= (min_edge / 100)].copy()
+        min_win_prob = float(st.session_state.get("min_win_prob", 50.0))
+        filtered = BettingEngine.filter_realistic(edges_df, min_edge, min_win_prob)
 
         # ── top picks ──
         st.markdown('<div class="section-label">Top Picks</div>', unsafe_allow_html=True)
         if filtered.empty:
-            st.info(f"No picks with edge ≥ {min_edge:.1f}%. Lower the minimum edge in the sidebar.")
+            st.info(f"No picks with edge ≥ {min_edge:.1f}% and win chance ≥ {min_win_prob:.0f}%. Lower either minimum in the sidebar.")
             return
 
         self._render_top_picks_row(filtered, sport=league_label, n=6)
@@ -571,7 +574,7 @@ h2, h3 { color: #c9d1d9 !important; font-weight: 700 !important; }
         st.markdown('<div class="section-label">Parlay Builder</div>', unsafe_allow_html=True)
 
         seed_games = (
-            filtered.sort_values("edge", ascending=False)
+            filtered.sort_values("pick_score", ascending=False)
             .head(parlay_top_n)["game"].drop_duplicates().tolist()
         )
         parlay_input = edges_df[edges_df["game"].isin(seed_games)].copy()
@@ -1054,7 +1057,7 @@ h2, h3 { color: #c9d1d9 !important; font-weight: 700 !important; }
 
         defaults = {
             "api_key": secrets_key, "season": datetime.now().year,
-            "min_edge": 2.0, "home_field_adv": 0.06, "parlay_legs": 3, "parlay_top_n": 8,
+            "min_edge": 2.0, "min_win_prob": 50.0, "home_field_adv": 0.06, "parlay_legs": 3, "parlay_top_n": 8,
             "bankroll": 10.0, "max_alloc_parlays": 12, "fractional_kelly": 0.35,
             "diversification_bias": 0.85, "max_team_uses": 2, "max_bet_pct": 15.0,
             "max_team_exposure_pct": 35.0, "contrarian_mix_pct": 20.0,
@@ -1127,6 +1130,8 @@ h2, h3 { color: #c9d1d9 !important; font-weight: 700 !important; }
                       help="Total bankroll to allocate across recommended parlays.", key="bankroll")
             st.slider("Minimum edge (%)", min_value=0.0, max_value=20.0, step=0.5,
                       help="Only show picks where model probability exceeds market by this %.", key="min_edge")
+            st.slider("Minimum win chance (%)", min_value=30.0, max_value=80.0, step=1.0,
+                      help="Only show picks the model thinks win at least this often. 50 = model's predicted winner only.", key="min_win_prob")
             st.checkbox("Only games later today", key="only_later_today")
 
             st.divider()
